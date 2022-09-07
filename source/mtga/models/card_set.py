@@ -8,7 +8,7 @@ class Set(object):
     def __init__(self, set_name, cards=None):
         self.set_name = set_name
         self.mtga_ids = set()
-        self.cards_in_set = list()
+        self.cards_in_set = []
 
         if cards:
             for card in cards:
@@ -16,7 +16,7 @@ class Set(object):
 
     def add_card(self, card):
         if card.mtga_id in self.mtga_ids:
-            raise ValueError("This set already has MTGA ID {}".format(card.mtga_id))
+            raise ValueError(f"This set already has MTGA ID {card.mtga_id}")
         self.cards_in_set.append(card)
         self.mtga_ids.add(card.mtga_id)
 
@@ -36,25 +36,19 @@ class Pool(object):
             self.lookup[card.mtga_id] = card
 
     def __repr__(self):
-        return "<Pool {}: {} cards>".format(self.pool_name, len(self.cards))
+        return f"<Pool {self.pool_name}: {len(self.cards)} cards>"
 
     def __hash__(self):
-        _hash = 0
-        for idx, element in enumerate(self.cards):
-            hashable = element.name + str(idx)
-            _hash += hash(hashable)
-        return _hash
+        return sum(
+            hash(element.name + str(idx)) for idx, element in enumerate(self.cards)
+        )
 
     @property
     def total_count(self):
         return len(self.cards)
 
     def count_cards_owned_by(self, seat):
-        total = 0
-        for card in self.cards:
-            if card.owner_seat_id == seat:
-                total += 1
-        return total
+        return sum(card.owner_seat_id == seat for card in self.cards)
 
     def count(self, mtga_id):
         return len([card for card in self.cards if card.mtga_id == mtga_id])
@@ -92,16 +86,18 @@ class Pool(object):
             abilities = {}
         cards = []
         for set in sets:
-            for card in set.cards_in_set:
-                cards.append(card)
+            cards.extend(iter(set.cards_in_set))
         return Pool(pool_name, cards, abilities)
 
     def find_one(self, id_or_keyword):
         result = set(self.search(id_or_keyword))
-        if len(result) < 1:
-            raise ValueError("Pool does not contain {}".format(id_or_keyword))
+        if not result:
+            raise ValueError(f"Pool does not contain {id_or_keyword}")
         elif len(result) > 1:
-            raise ValueError("Pool search '{}' not narrow enough, got: {}".format(id_or_keyword, result))
+            raise ValueError(
+                f"Pool search '{id_or_keyword}' not narrow enough, got: {result}"
+            )
+
         return result.pop()
 
     def search(self, id_or_keyword, direct_match_returns_single=False):
@@ -119,7 +115,7 @@ class Pool(object):
             return [self.lookup[keyword_as_int]]
         results = []
         for card in self.cards:
-            if keyword_as_int == card.mtga_id or keyword_as_int == card.set_number:
+            if keyword_as_int in [card.mtga_id, card.set_number]:
                 return [card]
 
             keyword_clean = re.sub('[^0-9a-zA-Z_]', '', keyword_as_str.lower())
@@ -139,9 +135,11 @@ class Zone(Pool):
         for card in self.cards:
             assert isinstance(card, GameCard)
             if card.game_id == instance_id or instance_id in card.previous_iids:
-                if card.mtga_id != -1 and card.mtga_id != card_id:
-                    raise Exception("WHOA. tried to match iid {} to {}, but already has card {}".format(
-                        str(instance_id), str(card_id), str(card.mtga_id)))
+                if card.mtga_id not in [-1, card_id]:
+                    raise Exception(
+                        f"WHOA. tried to match iid {str(instance_id)} to {str(card_id)}, but already has card {str(card.mtga_id)}"
+                    )
+
                 card.transform_to(card_id)
             elif card.mtga_id == card_id:
                 # only allowed to set it if it's still -1 (should probably never hit this!)
@@ -174,7 +172,7 @@ class Deck(Pool):
             for card in self.cards:
                 card_dict[card.mtga_id] = card_dict.get(card.mtga_id, card.to_serializable())
                 card_dict[card.mtga_id]["count_in_deck"] = card_dict[card.mtga_id].get("count_in_deck", 0) + 1
-            obj["cards"] = [v for v in card_dict.values()]
+            obj["cards"] = list(card_dict.values())
             obj["cards"].sort(key=lambda x: x["count_in_deck"])
             obj["cards"].reverse()
             obj["cards"] = obj["cards"]

@@ -26,11 +26,7 @@ LONG_DESCRIPTION = ''
 def read_requirements_file(path):
     """ reads requirements.txt file """
     with open(path) as f:
-        requires = []
-        for line in f.readlines():
-            if not line:
-                continue
-            requires.append(line.strip())
+        requires = [line.strip() for line in f if line]
     return requires
 
 
@@ -42,12 +38,10 @@ if __name__ == "__main__":
         with open(VERSION_FILE) as f:
             lines = f.read()
         version_regex = "^__version__ = ['\"]([^'\"]*)['\"]"
-        search_result = re.search(version_regex, lines, re.M)
-        if search_result:
-            __version__ = search_result.group(1)
-        else:
-            if os.environ.get('JENKINS_HOME'):
-                raise RuntimeError("Unable to find version string in %s." % (VERSION_FILE,))
+        if search_result := re.search(version_regex, lines, re.M):
+            __version__ = search_result[1]
+        elif os.environ.get('JENKINS_HOME'):
+            raise RuntimeError(f"Unable to find version string in {VERSION_FILE}.")
     assert __version__ is not None, "Version not found in _version.py nor major_version"
 
     _install_requires = read_requirements_file('requirements.txt')

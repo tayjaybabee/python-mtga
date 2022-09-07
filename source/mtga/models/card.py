@@ -37,24 +37,25 @@ class Card(object):
 
     @property
     def colors(self):
-        colors = []
-        for color_key in COLORMAP.keys():
-            if color_key in self.cost or color_key in self.color_identity:
-                colors.append(COLORMAP[color_key])
+        colors = [
+            COLORMAP[color_key]
+            for color_key in COLORMAP.keys()
+            if color_key in self.cost or color_key in self.color_identity
+        ]
+
+        if not colors and self.card_type == "Basic Land":
+            if "Plains" in self.pretty_name:
+                colors = ["White"]
+            if "Swamp" in self.pretty_name:
+                colors = ["Black"]
+            if "Forest" in self.pretty_name:
+                colors = ["Green"]
+            if "Mountain" in self.pretty_name:
+                colors = ["Red"]
+            if "Island" in self.pretty_name:
+                colors = ["Blue"]
         if not colors:
-            if self.card_type == "Basic Land":
-                if "Plains" in self.pretty_name:
-                    colors = ["White"]
-                if "Swamp" in self.pretty_name:
-                    colors = ["Black"]
-                if "Forest" in self.pretty_name:
-                    colors = ["Green"]
-                if "Mountain" in self.pretty_name:
-                    colors = ["Red"]
-                if "Island" in self.pretty_name:
-                    colors = ["Blue"]
-            if not colors:
-                colors = ["Colorless"]
+            colors = ["Colorless"]
         return colors
 
     @property
@@ -91,12 +92,23 @@ class Card(object):
         try:
             return all_mtga_cards.find_one(obj["mtga_id"])
         except ValueError:
-            new_unknown_card = cls("unknown_{}".format(obj["mtga_id"]), "{}: Unknown MTGA ID".format(obj["mtga_id"]), [], [], "unknown", "unknown", "unknown", -1, obj["mtga_id"])
+            new_unknown_card = cls(
+                f'unknown_{obj["mtga_id"]}',
+                f'{obj["mtga_id"]}: Unknown MTGA ID',
+                [],
+                [],
+                "unknown",
+                "unknown",
+                "unknown",
+                -1,
+                obj["mtga_id"],
+            )
+
             all_mtga_cards.cards.append(new_unknown_card)
             return new_unknown_card
 
     def __repr__(self):
-        return "<Card: '{}' {} {} {}>".format(self.pretty_name, self.colors, self.set, self.mtga_id)
+        return f"<Card: '{self.pretty_name}' {self.colors} {self.set} {self.mtga_id}>"
 
     def __str__(self):
         return self.__repr__()
@@ -118,9 +130,9 @@ class GameCard(Card):
 
     def __repr__(self):
         if self.mtga_id != -1:
-            return "<GameCard: {} {} iid={}>".format(self.name, self.mtga_id, self.game_id)
+            return f"<GameCard: {self.name} {self.mtga_id} iid={self.game_id}>"
         else:
-            return "<UnknownCard: iid={}>".format(self.game_id)
+            return f"<UnknownCard: iid={self.game_id}>"
 
     def transform_to(self, card_id):
         from ..set_data import all_mtga_cards

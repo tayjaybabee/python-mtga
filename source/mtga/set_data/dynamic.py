@@ -65,11 +65,8 @@ for filepath in sorted(Path(data_location).iterdir(), key=os.path.getmtime):
     filename = os.path.basename(filepath)
     # In case of rogue files
     filesplit = filename.split("_")
-    if len(filesplit) > 1:
-        key = filesplit[1]
-    else:
-        key = ""
-    if key in json_filepaths.keys() and filename.endswith("mtga"):
+    key = filesplit[1] if len(filesplit) > 1 else ""
+    if key in json_filepaths and filename.endswith("mtga"):
         # print("setting {} to {}".format(key, filename))
         json_filepaths[key] = filepath
 
@@ -82,23 +79,21 @@ with open(json_filepaths["loc"], "r", encoding="utf-8") as loc_in:
 with open(json_filepaths["enums"], "r", encoding="utf-8") as enums_in:
     enums = json.load(enums_in)
 
-listed_cardsets = list(set([card["set"] for card in cards]))
+listed_cardsets = list({card["set"] for card in cards})
 
+# print("translating {} cards from set {}".format(len(set_cards), set_name))
+output_lines = []
 for set_name in listed_cardsets:
     used_classnames = []
     set_name_class_cased = re.sub('[^0-9a-zA-Z_]', '', set_name)
     all_abilities = {}
 
-    loc_map = {}
     try:
         en = list(filter(lambda x: x["langkey"] == "EN", loc))[0]
     except:
         ## langkeys are null in 11/21 patch???
         en = loc[0]
-    for obj in en["keys"]:
-        # if obj["id"] in loc_map.keys():
-        #     print("WARNING: overwriting id {} = {} with {}".format(obj["id"], loc_map[obj["id"]], obj["text"]))
-        loc_map[obj["id"]] = obj["text"]
+    loc_map = {obj["id"]: obj["text"] for obj in en["keys"]}
     loc_map = {obj["id"]: obj["text"] for obj in en["keys"]}
     enum_map = {obj["name"]: {inner_obj["id"]: inner_obj["text"] for inner_obj in obj["values"]} for obj in enums}
     set_cards = [card for card in cards if card["set"].upper() == set_name.upper()]
@@ -106,8 +101,6 @@ for set_name in listed_cardsets:
 
     token_count = 1
 
-    # print("translating {} cards from set {}".format(len(set_cards), set_name))
-    output_lines = []
     set_card_objs = []
     for card in set_cards:
         try:
@@ -165,7 +158,7 @@ for set_name in listed_cardsets:
                 except:
                     # TODO: there are multiple loc files now?? something weird is up. I don't really feel like trying to
                     # figure this out right now though.
-                    text = "unknown ability id {} / {}".format(aid, textid)
+                    text = f"unknown ability id {aid} / {textid}"
                 abilities.append(aid)
                 all_abilities[aid] = text
 
@@ -176,9 +169,11 @@ for set_name in listed_cardsets:
             set_card_objs.append(new_card_obj)
 
         except Exception:
-            print("hit an error on {} / {} / {}".format(card["grpid"], loc_map[card["titleId"]],
-                                                        card["collectorNumber"]))
-            # raise
+            print(
+                f'hit an error on {card["grpid"]} / {loc_map[card["titleId"]]} / {card["collectorNumber"]}'
+            )
+
+                    # raise
     card_set_obj = Set(set_name_class_cased, cards=set_card_objs)
     dynamic_set_tuples.append((card_set_obj, all_abilities))
 
