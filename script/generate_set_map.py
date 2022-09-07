@@ -6,6 +6,7 @@ loc.json can also be obtained with minor modifications: data_loc_ instead of dat
 
 """
 
+
 import argparse
 import json
 import re
@@ -22,8 +23,8 @@ jsons = {"enums": None, "cards": None, "abilities": None, "loc": None}
 
 for filename in os.listdir(data_loc):
     key = filename.split("_")[1]
-    if key in jsons.keys():
-        print("setting {} to {}".format(key, filename))
+    if key in jsons:
+        print(f"setting {key} to {filename}")
         jsons[key] = os.path.join(data_loc, filename)
 
 COLOR_ID_MAP = {1: "W", 2: "U", 3: "B", 4: "R", 5: "G"}
@@ -44,8 +45,11 @@ def generate_set_map(loc, cards, enums, set_name):
     loc_map = {}
     en = list(filter(lambda x: x["langkey"] == "EN", loc))[0]
     for obj in en["keys"]:
-        if obj["id"] in loc_map.keys():
-            print("WARNING: overwriting id {} = {} with {}".format(obj["id"], loc_map[obj["id"]], obj["text"]))
+        if obj["id"] in loc_map:
+            print(
+                f'WARNING: overwriting id {obj["id"]} = {loc_map[obj["id"]]} with {obj["text"]}'
+            )
+
         loc_map[obj["id"]] = obj["text"]
     loc_map = {obj["id"]: obj["text"] for obj in en["keys"]}
     enum_map = {obj["name"]: {inner_obj["id"]: inner_obj["text"] for inner_obj in obj["values"]} for obj in enums}
@@ -54,7 +58,7 @@ def generate_set_map(loc, cards, enums, set_name):
 
     token_count = 1
 
-    print("translating {} cards from set {}".format(len(set_cards), set_name))
+    print(f"translating {len(set_cards)} cards from set {set_name}")
     output_lines = []
     for card in set_cards:
         try:
@@ -88,11 +92,10 @@ def generate_set_map(loc, cards, enums, set_name):
             if card["isToken"]:
                 set_number = token_count + 10000
                 token_count += 1
+            elif card["collectorNumber"].startswith("GR") or card["collectorNumber"].startswith("GP"):
+                set_number = int(card["collectorNumber"][2]) * 1000
             else:
-                if card["collectorNumber"].startswith("GR") or card["collectorNumber"].startswith("GP"):
-                    set_number = int(card["collectorNumber"][2]) * 1000
-                else:
-                    set_number = int(card["collectorNumber"])
+                set_number = int(card["collectorNumber"])
 
             grp_id = card["grpid"]
             abilities = []
@@ -104,7 +107,7 @@ def generate_set_map(loc, cards, enums, set_name):
                 text = loc_map[textid].encode("ascii", errors="ignore").decode()
                 abilities.append(aid)
                 all_abilities[aid] = text
-            indentation_length = len("{} = Card(".format(card_name_class_cased_suffixed))
+            indentation_length = len(f"{card_name_class_cased_suffixed} = Card(")
             # params: name,    pretty_name, cost,            color_identity, card_type,  sub_types, set_id, rarity,        set_number, mtga_id
             # ex:     "a_b_c", "A B C",     ['3', 'W', 'W'], ['W'],          "Creature", "Angel",  "AKH",   "Mythic Rare", 1,          64801
             # name, pretty_name, cost, color_identity, card_type, sub_types, set_id, rarity, set_number, mtga_id
@@ -129,7 +132,10 @@ def generate_set_map(loc, cards, enums, set_name):
             output_lines.append(new_card_str)
 
         except Exception:
-            print("hit an error on {} / {} / {}".format(card["grpid"], loc_map[card["titleId"]], card["collectorNumber"]))
+            print(
+                f'hit an error on {card["grpid"]} / {loc_map[card["titleId"]]} / {card["collectorNumber"]}'
+            )
+
             raise
     header = """
 import sys
@@ -144,7 +150,7 @@ clsmembers = [card for name, card in inspect.getmembers(sys.modules[__name__]) i
 
 set_ability_map = {}
 """.format(set_name_class_cased, set_name_snake_cased, pprint.pformat(all_abilities))
-    with open("{}.py".format(set_name.lower()), "w") as set_file:
+    with open(f"{set_name.lower()}.py", "w") as set_file:
         set_file.write("{}\n\n{}\n\n{}".format(header, "\n".join(output_lines), footer))
 
 
